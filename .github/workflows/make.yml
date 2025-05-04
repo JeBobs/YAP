@@ -17,45 +17,55 @@ jobs:
           - os: ubuntu-latest
             host: linux
             qtArch: gcc_64
+            arch: x64
           - os: ubuntu-22.04-arm64
             host: linux
             qtArch: aarch64
+            arch: arm64
           - os: windows-latest
             host: windows
             qtArch: win64_msvc2019_64
+            arch: x64
+          - os: windows-latest
+            host: windows
+            qtArch: win64_msvc2019_arm64
+            arch: arm64
           - os: macos-latest
             host: mac
             qtArch: clang_64
+            arch: x64
           - os: macos-latest
             host: mac
             qtArch: clang_arm64
+            arch: arm64
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install CMake
-        uses: jwlawson/actions-setup-cmake@v2
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          cmake-version: '3.27'
+          python-version: '3.x'
 
-      - name: Install Qt installer
-        run: pip install aqtinstall
+      - name: Install aqtinstall
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install aqtinstall
 
       - name: Install Qt
         run: |
-          python3 -m aqt install-qt ${{ matrix.host }} desktop 6.6.3 ${{ matrix.qtArch }} --outputdir Qt --confirm-architectures
+          python3 -m aqt install-qt ${{ matrix.host }} desktop 6.6.3 ${{ matrix.qtArch }} --outputdir Qt
 
-      - name: Configure with CMake
+      - name: Configure CMake
         run: |
-          cmake -B build -S . -DCMAKE_PREFIX_PATH=$PWD/Qt/6.6.3/${{ matrix.qtArch }} \
-                -DCMAKE_BUILD_TYPE=Release
+          mkdir -p build
+          cd build
+          cmake .. -DCMAKE_PREFIX_PATH=$(pwd)/../Qt/qt6-${{ matrix.host }}
 
       - name: Build
-        run: cmake --build build --config Release --parallel
+        run: cmake --build build --config Release
 
-      - name: Package
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: yap-${{ matrix.host }}-${{ matrix.qtArch }}
+          name: YAP-${{ matrix.os }}-${{ matrix.arch }}
           path: build/Release
-          retention-days: 7
