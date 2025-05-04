@@ -31,33 +31,45 @@ jobs:
             qtArch: win64_msvc2019_arm64
             arch: arm64
           - os: macos-latest
-            host: mac
+            host: macos
             qtArch: clang_64
             arch: x64
+    env:
+      QT_OUT_DIR: ${{ github.workspace }}/Qt
+      QT_INSTALL_DIR: ${{ env.QT_OUT_DIR }}/6.6.3/${{ matrix.qtArch }}
+      CMAKE_PREFIX_PATH: ${{ env.QT_INSTALL_DIR }}
 
     steps:
-      - name: Setup Python & aqtinstall
-        run: |
-          python3 -m pip install --upgrade pip
-          pip install aqtinstall
       - uses: actions/checkout@v4
 
-      - name: Install Qt
-        run: |
-          python3 -m aqt install-qt ${{ matrix.host }} desktop 6.6.3 ${{ matrix.qtArch }} --outputdir Qt
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
 
-      - name: Configure CMake
+      - name: Install aqtinstall
+        run: pip install --upgrade pip aqtinstall
+
+      - name: Install Qt ${{ matrix.qtArch }}
         run: |
-          cmake -B build -S . \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH=$PWD/Qt/${{ matrix.host }}/6.6.3/${{ matrix.qtArch }}
+          python -m aqt install-qt ${{ matrix.host }} desktop 6.6.3 ${{ matrix.qtArch }} --outputdir Qt
+
+      - name: Configure with CMake
+        run: |
+          mkdir -p build
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${{ env.CMAKE_PREFIX_PATH }}"
 
       - name: Build
-        run: |
-          cmake --build build --config Release
+        run: cmake --build build --config Release
 
-      - name: Package Artifacts
+      - name: Package
+        run: |
+          cd build
+          cpack -G ZIP
+
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: YAP-${{ matrix.host }}-${{ matrix.arch }}
-          path: build
+          name: YAP-${{ matrix.os }}-${{ matrix.arch }}
+          path: build/*.zip
