@@ -16,42 +16,46 @@ jobs:
         include:
           - os: ubuntu-latest
             host: linux
-            arch: x64
+            qtArch: gcc_64
           - os: ubuntu-22.04-arm64
             host: linux
-            arch: arm64
+            qtArch: aarch64
           - os: windows-latest
             host: windows
-            arch: x64
-          - os: windows-latest
-            host: windows
-            arch: arm64
+            qtArch: win64_msvc2019_64
           - os: macos-latest
             host: mac
-            arch: x64
+            qtArch: clang_64
           - os: macos-latest
             host: mac
-            arch: arm64
+            qtArch: clang_arm64
     steps:
-      - name: Checkout repository
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Setup Qt
-        uses: jurplel/install-qt-action@v4
+      - name: Install CMake
+        uses: jwlawson/actions-setup-cmake@v2
         with:
-          version: 6.6.3
-          host: ${{ matrix.host }}
-          arch: ${{ matrix.arch }}
+          cmake-version: '3.27'
 
-      - name: Configure CMake
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Install Qt installer
+        run: pip install aqtinstall
+
+      - name: Install Qt
+        run: |
+          python3 -m aqt install-qt ${{ matrix.host }} desktop 6.6.3 ${{ matrix.qtArch }} --outputdir Qt --confirm-architectures
+
+      - name: Configure with CMake
+        run: |
+          cmake -B build -S . -DCMAKE_PREFIX_PATH=$PWD/Qt/6.6.3/${{ matrix.qtArch }} \
+                -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build --config Release --parallel
 
-      - name: Upload build artifact
-        if: github.ref == 'refs/heads/main'
+      - name: Package
         uses: actions/upload-artifact@v4
         with:
-          name: release-${{ matrix.host }}-${{ matrix.arch }}
-          path: build
+          name: yap-${{ matrix.host }}-${{ matrix.qtArch }}
+          path: build/Release
+          retention-days: 7
