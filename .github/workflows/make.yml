@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x64
+            host: linux
+            toolchain: ''
+          - os: ubuntu-22.04-arm64
+            arch: arm64
+            host: linux
+            toolchain: ''
+          - os: windows-latest
+            arch: x64
+            host: windows
+            toolchain: '-G "Visual Studio 17 2022" -A x64'
+          - os: windows-latest
+            arch: arm64
+            host: windows
+            toolchain: '-G "Visual Studio 17 2022" -A arm64'
+          - os: macos-latest
+            arch: x64
+            host: macos
+            toolchain: '-DCMAKE_OSX_ARCHITECTURES=x86_64'
+          - os: macos-latest
+            arch: arm64
+            host: macos
+            toolchain: '-DCMAKE_OSX_ARCHITECTURES=arm64'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.6.3"
+          host: ${{ matrix.host }}
+          arch: ${{ matrix.arch }}
+          dir: ${{ github.workspace }}/qt
+          cache: true
+
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build/${{ matrix.os }}-${{ matrix.arch }} ${{ matrix.toolchain }} -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${{ env.QT_ROOT_DIR }}"
+
+      - name: Build
+        run: cmake --build build/${{ matrix.os }}-${{ matrix.arch }} --config Release --parallel
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: YAP-${{ matrix.os }}-${{ matrix.arch }}
+          path: build/${{ matrix.os }}-${{ matrix.arch }}/**/YAP*
